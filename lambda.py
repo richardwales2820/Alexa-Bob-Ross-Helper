@@ -1,6 +1,20 @@
+from __future__ import print_function
+from pynamodb.models import Model
+from pynamodb.attributes import UnicodeAttribute, ListAttribute
+import json
+import random
+
+class PaintingModel(Model):
+    class Meta:
+        table_name = "painting"
+    
+    episode = UnicodeAttribute(hash_key=True)
+    title = UnicodeAttribute()
+    colors = ListAttribute()
+
 def lambda_handler(event, context):
     #TODO(rwales): Change this
-    if (event["session"]["application"]["applicationId"] != "amzn1.ask.skill.f20a1179-50fd-49a0-ac2d-0c03d32096c6"):
+    if (event["session"]["application"]["applicationId"] != "amzn1.ask.skill.51ab8847-6dd1-425e-a4b4-82cbcd200789"):
         raise ValueError("Invalid Application ID")
     
     if event["session"]["new"]:
@@ -23,8 +37,8 @@ def on_intent(intent_request, session):
     intent = intent_request["intent"]
     intent_name = intent_request["intent"]["name"]
 
-    if intent_name == "ColorIntent":
-        return get_painting_by_color()
+    if intent_name == "PaintingIntent":
+        return get_random_painting()
     elif intent_name == "AMAZON.HelpIntent":
         return get_welcome_response()
     elif intent_name == "AMAZON.CancelIntent" or intent_name == "AMAZON.StopIntent":
@@ -46,10 +60,28 @@ def handle_session_end_request():
 def get_welcome_response():
     session_attributes = {}
     card_title = "Happy Little Helper"
-    speech_output = "Give me a list of colors you want to paint with and I'll tell you what Bob Ross paintings use them"
-    reprompt_text = "Ask me, what paintings use your colors"
+    speech_output = "I can tell you a random Bob Ross masterpiece to try and what paints it requires"
+    reprompt_text = "Ask me, what should I paint?"
     should_end_session = False
 
+    return build_response(session_attributes, build_speechlet_response(
+        card_title, speech_output, reprompt_text, should_end_session))
+
+def get_random_painting():
+    session_attributes = {}
+    card_title = 'Happy Little Helper'
+    reprompt_text = None
+    should_end_session = True
+
+    paintings = json.loads(PaintingModel.dumps())
+    painting = paintings[random.randint(0, len(paintings)-1)]
+
+    episode = painting[0]
+    title = painting[1]['attributes']['title']['S']
+    colors = [x['S'] for x in painting[1]['attributes']['colors']['L']]
+
+    speech_output = '{} from {} uses colors '.format(title, episode) + ', '.join(colors[:-1]) + colors[-1]
+    
     return build_response(session_attributes, build_speechlet_response(
         card_title, speech_output, reprompt_text, should_end_session))
 
